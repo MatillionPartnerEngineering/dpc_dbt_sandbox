@@ -1,0 +1,87 @@
+type: "orchestration"
+version: "1.0"
+pipeline:
+  components:
+    Start:
+      type: "start"
+      transitions:
+        unconditional:
+        - "CFB"
+      parameters:
+        componentName: "Start"
+    CFB:
+      type: "modular-api-extract-input-v1"
+      transitions:
+        unconditional:
+        - "Commands for dbt Core"
+      parameters:
+        componentName: "CFB"
+        inputId: "api-extract-input-v1"
+        api-extract-input-v1:
+          profile: "custom-5be3221a-691a-4e7b-9b23-99bd551f574e"
+          endpoint: "BettingLines"
+          connectionRef:
+            authType: "NONE"
+          uriParams:
+          queryParams:
+          - name: "year"
+            value: "2018"
+          headerParams:
+          - name: "Authorization"
+            value: "Bearer pQJWHv3l90s2Np4GFXx/vcvDiePoMzbDT79DYck0zsfWgK8auGkczIXJhNZYoVF8"
+          postBody:
+          pageLimit:
+        outputId: "snowflake-output-connector-v0"
+        snowflake-output-connector-v0:
+          warehouse: "[Environment Default]"
+          database: "[Environment Default]"
+          schema: "[Environment Default]"
+          tableName: "BettingLines_2018"
+          createTableMode: "REPLACE_IF_EXISTS"
+          cleanStagedFiles: "Yes"
+          stagePlatform: "SNOWFLAKE"
+          snowflake#internalStageType: "USER"
+    Commands for dbt Core:
+      type: "commands-for-dbt-core"
+      parameters:
+        componentName: "Commands for dbt Core"
+        command: "dbt run"
+        dbtUrl: "https://github.com/cnvertbleweathr/dbt_vs_code.git"
+        branch: "master"
+        gitFolderPath: "pe_metrics"
+        userName: "cnvertbleweathr"
+        gitPassword: "kg_github_cnverttoken"
+        mapDbtEnvironmentVariables:
+        config:
+        profileConfig:
+design:
+  components:
+    Start:
+      position:
+        x: -360
+        "y": -50
+      tempMetlId: 1
+    CFB:
+      position:
+        x: -160
+        "y": -60
+      tempMetlId: 2
+    Commands for dbt Core:
+      position:
+        x: 500
+        "y": -60
+      tempMetlId: 3
+  notes:
+    "1":
+      position:
+        x: -390
+        "y": -320
+      size:
+        height: 228
+        width: 410
+      theme: "white"
+      content: "What is the most unpredictable conference in all of CFB? \n\nWhat\
+        \ will be the most unpredictable conference in 2024?\n\n**Method**\n- API\
+        \ calls for teams in Big 10\n- Stage all responses in S3\n- Mass upload to\
+        \ single raw table in S3\n- Unpack JSON to staging table\n- dbt to transform,\
+        \ test, snapshot table\n- Shared pipeline to conduct Cortex prediction"

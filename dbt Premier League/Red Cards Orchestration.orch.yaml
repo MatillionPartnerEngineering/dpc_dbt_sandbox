@@ -1,0 +1,303 @@
+type: "orchestration"
+version: "1.0"
+pipeline:
+  components:
+    Start:
+      type: "start"
+      transitions:
+        unconditional:
+        - "Premier League"
+      parameters:
+        componentName: "Start"
+    Premier League:
+      type: "modular-api-extract-input-v1"
+      transitions:
+        success:
+        - "Yesterday's Date"
+      parameters:
+        componentName: "Premier League"
+        inputId: "api-extract-input-v1"
+        api-extract-input-v1:
+          profile: "custom-a34da799-8276-401d-ad6a-0b52e9b243b7"
+          endpoint: "Red Card Leaders"
+          connectionRef:
+            authType: "NONE"
+          uriParams:
+          queryParams:
+          - name: "league"
+            value: "39"
+          - name: "season"
+            value: "2022"
+          headerParams:
+          - name: "X-RapidAPI-Key"
+            value: "ffcbe1c542msh9dc112366802618p1962a4jsnc0f8a1c434aa"
+          - name: "X-RapidAPI-Host"
+            value: "api-football-v1.p.rapidapi.com"
+          postBody:
+          pageLimit:
+        outputId: "snowflake-output-connector-v0"
+        snowflake-output-connector-v0:
+          warehouse: "[Environment Default]"
+          database: "[Environment Default]"
+          schema: "[Environment Default]"
+          tableName: "REDCARDS_SEMISTRUCTURED"
+          createTableMode: "REPLACE_IF_EXISTS"
+          cleanStagedFiles: "Yes"
+          stagePlatform: "SNOWFLAKE"
+          snowflake#internalStageType: "USER"
+    Yesterday's Date:
+      type: "python-pushdown"
+      transitions:
+        success:
+        - "Unpack JSON & Join Last Updated Date"
+      parameters:
+        componentName: "Yesterday's Date"
+        externalAccessIntegrations:
+        packages:
+        pythonScript: |
+          from datetime import datetime, timedelta
+
+          # Get today's date
+          today = datetime.now()
+
+          # Calculate yesterday's date
+          yesterday = today - timedelta(days=1)
+
+          # Format yesterday's date
+          formatted_yesterday = yesterday.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+          print(formatted_yesterday)
+
+          context.updateVariable('proj_yest_date', formatted_yesterday)
+          # Updating a grid variable:
+          #   context.updateGridVariable('mygridvar',[['list','of'],['lists','!']])
+          ###)
+        scriptTimeout: "360"
+    Unpack JSON & Join Last Updated Date:
+      type: "run-transformation"
+      transitions:
+        success:
+        - "Grid Iterator"
+      parameters:
+        componentName: "Unpack JSON & Join Last Updated Date"
+        transformationJob: "dbt Premier League/Red Cards Transformation"
+        setScalarVariables:
+        - - "xform_yestdate"
+          - "${orch_yestdate}"
+        setGridVariables:
+    dbt build:
+      type: "commands-for-dbt-core"
+      parameters:
+        componentName: "dbt build"
+        command: "${pv_dbt_command}"
+        dbtUrl: "https://github.com/MatillionPartnerEngineering/dbt_matillion_repo.git"
+        branch: "packages"
+        gitFolderPath:
+        userName: "MatillionPartnerEngineering"
+        gitPassword: "kg_github_matillionpartnerengineering"
+        mapDbtEnvironmentVariables:
+        - - "target_database"
+          - "ANALYTICS"
+        - - "target_schema"
+          - "PUBLIC"
+        config:
+        profileConfig:
+    Grid Iterator:
+      type: "grid-iterator"
+      transitions:
+        success:
+        - "ChatGPT - Coach's advice"
+      iterationTarget: "dbt build"
+      parameters:
+        componentName: "Grid Iterator"
+        gridVariable: "gv_dbt_commands"
+        gridIteratorVariableMapping:
+        - - "gvc_dbt_commands"
+          - "pv_dbt_command"
+        breakOnFailure: "No"
+        concurrency: "Sequential"
+    ChatGPT - Coach's advice:
+      type: "unknown-orchestration"
+      transitions:
+        success:
+        - "End Success"
+        failure:
+        - "Send Email"
+      parameters:
+        "1": "ChatGPT - Coach's advice"
+        "2": "{\"provider\":\"OpenAI\",\"openAI\":{\"model\":\"gpt-4\",\"apiKey\"\
+          :\"kg_chatgpterror\",\"temperature\":\"1\",\"topP\":\"1\",\"n\":\"1\",\"\
+          maxTokens\":null}}"
+        "3": "{\"snowflake\":{\"database\":\"[Environment Default]\",\"schema\":\"\
+          [Environment Default]\",\"table\":\"STG_REDCARDS_STRUCTURED\",\"keyColumn\"\
+          :\"PLAYERNAME\",\"limit\":\"1000\"}}"
+        "4": "{\"userContext\":\"I want you to imagine you're a coach of the player\
+          \ (PLAYERNAME) from the same country (NATIONALITY) as the player. Evaluate\
+          \ the performance of the player using the statistics provided in columns,\
+          \ which include:\\n- the number of shots by the player on the opposing goal\
+          \ (SHOTS_ONGOAL; SHOTS_TOTAL)\\n- the number of fouls committed and drawn\
+          \ by the player (FOULS_COMMITTED; FOULS_DRAWN)\\n- the number of goals assisted\
+          \ and scored by the player (GOALS_ASSISTS: GOALS_TOTAL)\\n- the number of\
+          \ cards drawn on the player (SUMCARDS)\\nUsing the information, give the\
+          \ player advice in the language of the NATIONALITY field to help improve\
+          \ the players' game towards becoming a better player in the Premier League\
+          \ and helping their team (TEAMNAME) win more matches.\",\"inputs\":[[\"\
+          NATIONALITY\",\"\"],[\"PLAYERNAME\",\"\"],[\"TEAMNAME\",\"\"],[\"SHOTS_ONGOAL\"\
+          ,\"\"],[\"SHOTS_TOTAL\",\"\"],[\"FOULS_COMMITTED\",\"\"],[\"FOULS_DRAWN\"\
+          ,\"\"],[\"GOALS_ASSISTS\",\"\"],[\"GOALS_TOTAL\",\"\"],[\"SUMCARDS\",\"\"\
+          ]],\"outputFormat\":\"TEXT\"}"
+        "5": "{\"isRagEnabled\":\"No\"}"
+        "6": "{\"snowflake\":{\"database\":\"[Environment Default]\",\"schema\":\"\
+          [Environment Default]\",\"table\":\"REDCARDS_GPT\",\"createTableOptions\"\
+          :\"Replace if Table Exists\"}}"
+    Alter Warehouse:
+      type: "alter-warehouse"
+      parameters:
+        componentName: "Alter Warehouse"
+        warehouse: "[Environment Default]"
+        commandType: "Set"
+        properties:
+        - - "WAREHOUSE_SIZE"
+          - "XSMALL"
+    End Success:
+      type: "end-success"
+      parameters:
+        componentName: "End Success"
+    Send Email:
+      type: "send-email"
+      parameters:
+        componentName: "Send Email"
+        toRecipients:
+        - - "karey.graham@matillion.com"
+        ccRecipients:
+        subject: "Red Cards Orchestration Pipeline Failed - ChatGPT Component"
+        message: "Your pipeline has failed. \n\nPlease go here to address: https://partnerengineering.designer.eu1.matillion.com/project/2ba18f77-e833-4a45-a824-8da9bf5577df/branch/main/job/Red%20Cards%20Orchestration.orch.yaml/component/16?environmentId=94546cc5-0dbf-4fa2-ba3f-8dad4f8f6054&agentId=23c7d96f-1ecb-4b75-932d-3cef1f914bd4"
+        senderAddress: "karey.graham@gmail.com"
+        replyAddress:
+        smtpUsername: "karey.graham@gmail.com"
+        smtpPassword: "kg_smtp"
+        smtpHostname: "karey.graham@gmail.com"
+        smtpPort: "465"
+        enableSslTls: "Yes"
+        enableStarttls: "No"
+  variables:
+    orch_yestdate:
+      metadata:
+        type: "TEXT"
+        description: ""
+        scope: "COPIED"
+        visibility: "PUBLIC"
+      defaultValue: "2024-02-19"
+    pv_dbt_command:
+      metadata:
+        type: "TEXT"
+        description: ""
+        scope: "COPIED"
+        visibility: "PUBLIC"
+      defaultValue: "DEFAULT pv_dbt_command"
+    gv_dbt_commands:
+      metadata:
+        type: "GRID"
+        description: ""
+        scope: "COPIED"
+        visibility: "PUBLIC"
+        columns:
+          gvc_dbt_commands:
+            columnType: "TEXT"
+      defaultValue:
+      - - "dbt deps"
+      - - "dbt debug"
+      - - "dbt source freshness"
+      - - "dbt build --select redcards"
+design:
+  components:
+    Start:
+      position:
+        x: -390
+        "y": 0
+      tempMetlId: 1
+    Premier League:
+      position:
+        x: -50
+        "y": 0
+      tempMetlId: 2
+    Yesterday's Date:
+      position:
+        x: 150
+        "y": 0
+      tempMetlId: 3
+    Unpack JSON & Join Last Updated Date:
+      position:
+        x: 350
+        "y": 0
+      tempMetlId: 5
+    dbt build:
+      position:
+        x: 560
+        "y": -10
+      tempMetlId: 8
+    Grid Iterator:
+      position:
+        x: 560
+        "y": -10
+      tempMetlId: 12
+    ChatGPT - Coach's advice:
+      position:
+        x: 750
+        "y": 0
+      tempMetlId: 13
+    Alter Warehouse:
+      position:
+        x: -240
+        "y": -140
+      tempMetlId: 14
+    End Success:
+      position:
+        x: 930
+        "y": -130
+      tempMetlId: 15
+    Send Email:
+      position:
+        x: 930
+        "y": 0
+      tempMetlId: 16
+  notes:
+    "5":
+      position:
+        x: 80
+        "y": -290
+      size:
+        height: 380
+        width: 180
+      theme: "white"
+      content: "The **Yesterday's Date** component runs a Python script to extract\
+        \ yesterday's date. This date is then stored in the orchestration variable\
+        \ `${orch_yestdate}` and passed to subsequent components for use in filtering\
+        \ or partitioning data by date."
+    "6":
+      position:
+        x: 280
+        "y": -440
+      size:
+        height: 530
+        width: 180
+      theme: "white"
+      content: "The **Unpack JSON & Join Last Updated Date** transformation takes\
+        \ the JSON data extracted from the Premier League API and unpacks it into\
+        \ a structured format. It also joins the date variable `${orch_yestdate}`\
+        \ that was generated in the previous `Yesterday's Date` component to annotate\
+        \ each row with the date it was run. This prepares the data for further transformation\
+        \ and loading into the data warehouse."
+    "7":
+      position:
+        x: 490
+        "y": -390
+      size:
+        height: 480
+        width: 190
+      theme: "white"
+      content: "The **Grid Iterator** component iterates over the values in the `gv_dbt_commands`\
+        \ grid variable and runs the `dbt debug` component for each value, mapping\
+        \ the current grid value to the `pv_dbt_command` pipeline variable each time.\
+        \ This allows running multiple dbt commands like `dbt debug`, `dbt source\
+        \ freshness` and `dbt build` by specifying them in the grid variable."

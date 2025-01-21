@@ -1,0 +1,58 @@
+type: "orchestration"
+version: "1.0"
+pipeline:
+  components:
+    Start:
+      type: "start"
+      transitions:
+        unconditional:
+        - "dbt Core"
+      parameters:
+        componentName: "Start"
+    'Run dbt Core ':
+      type: "commands-for-dbt-core"
+      parameters:
+        componentName: "Run dbt Core "
+        command: "dbt run"
+        dbtUrl: "https://github.com/MatillionPartnerEngineering/Stepping-into-Data-with-Matillion-and-dbt/"
+        branch: "kg"
+        gitFolderPath:
+        userName: "partnersuccess@matillion.com"
+        gitPassword: "kg_github_cnverttoken"
+        mapDbtEnvironmentVariables:
+        - - "DBT_TARGET_DATABASE"
+          - "DEV_DB"
+        - - "DBT_TARGET_SCHEMA"
+          - "KAREY"
+        config:
+        profileConfig:
+    dbt Core:
+      type: "commands-for-dbt-core"
+      parameters:
+        componentName: "dbt Core"
+        command: "dbt run"
+        dbtUrl:
+        branch:
+        gitFolderPath:
+        userName:
+        gitPassword:
+        mapDbtEnvironmentVariables:
+        config:
+        profileConfig:
+design:
+  components:
+    Start:
+      position:
+        x: -140
+        "y": 0
+      tempMetlId: 1
+    'Run dbt Core ':
+      position:
+        x: 30
+        "y": -800
+      tempMetlId: 2
+    dbt Core:
+      position:
+        x: -10
+        "y": 0
+      tempMetlId: 3

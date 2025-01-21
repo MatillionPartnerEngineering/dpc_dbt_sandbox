@@ -1,0 +1,149 @@
+type: "transformation"
+version: "1.0"
+pipeline:
+  components:
+    Tasks:
+      type: "fixed-flow"
+      parameters:
+        componentName: "Tasks"
+        columns:
+        - - "task_num"
+          - "VARCHAR"
+          - ""
+          - ""
+        - - "task_total"
+          - "VARCHAR"
+          - ""
+          - ""
+        - - "task_result"
+          - "VARCHAR"
+          - ""
+          - ""
+        - - "task_name"
+          - "VARCHAR"
+          - ""
+          - ""
+        - - "task_duration"
+          - "VARCHAR"
+          - ""
+          - ""
+        values:
+          fromGrid:
+            variable: "gv_dbt_xtasks"
+            columns:
+            - "task_num"
+            - "task_total"
+            - "task_name"
+            - "task_result"
+            - "task_duration"
+    Current Date:
+      type: "fixed-flow"
+      parameters:
+        componentName: "Current Date"
+        columns:
+        - - "current_date"
+          - "TIMESTAMP"
+          - ""
+          - ""
+        values:
+        - - "${cur_date}"
+    Create View 0:
+      type: "create-view"
+      sources:
+      - "Join Tasks and Timestamp"
+      parameters:
+        componentName: "Create View 0"
+        database: "[Environment Default]"
+        schema: "[Environment Default]"
+        viewName: "dbt_matillion_log"
+        secureView: "No"
+        viewType: "Standard"
+    Join Tasks and Timestamp:
+      type: "join"
+      sources:
+      - "Tasks"
+      - "Current Date"
+      parameters:
+        componentName: "Join Tasks and Timestamp"
+        mainTable: "Tasks"
+        mainTableAlias: "tasks"
+        joins:
+        - - "Current Date"
+          - "date"
+          - "Inner"
+        joinExpressions:
+        - - "\"tasks\".\"task_num\" = \"tasks\".\"task_num\""
+          - "tasks_Inner_date"
+        columnMappings:
+        - - "tasks.task_num"
+          - "task_num"
+        - - "tasks.task_total"
+          - "task_total"
+        - - "tasks.task_result"
+          - "task_result"
+        - - "tasks.task_name"
+          - "task_name"
+        - - "tasks.task_duration"
+          - "task_duration"
+        - - "date.current_date"
+          - "timestamp"
+  variables:
+    cur_date:
+      metadata:
+        type: "TEXT"
+        description: ""
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "1900-01-01"
+    DestinationTable:
+      metadata:
+        type: "TEXT"
+        description: ""
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "dbt_matillion_log"
+    gv_dbt_xtasks:
+      metadata:
+        type: "GRID"
+        description: ""
+        scope: "SHARED"
+        visibility: "PUBLIC"
+        columns:
+          task_num:
+            columnType: "TEXT"
+          task_total:
+            columnType: "TEXT"
+          task_name:
+            columnType: "TEXT"
+          task_result:
+            columnType: "TEXT"
+          task_duration:
+            columnType: "TEXT"
+      defaultValue:
+      - - "0"
+        - "0"
+        - "DEFAULT_NAME"
+        - "DEFAULT_RESULT"
+        - "0.00"
+design:
+  components:
+    Tasks:
+      position:
+        x: 100
+        "y": 130
+      tempMetlId: 2427970
+    Current Date:
+      position:
+        x: 100
+        "y": 230
+      tempMetlId: 2427980
+    Create View 0:
+      position:
+        x: 432
+        "y": 128
+      tempMetlId: 2427981
+    Join Tasks and Timestamp:
+      position:
+        x: 256
+        "y": 128
+      tempMetlId: 2427982
